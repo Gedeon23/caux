@@ -60,7 +60,7 @@ int getDevices() {
         dev->type = playrec;
       }
 
-      dev->def = false;
+      dev->def = (strstr(buffer, "default") != NULL);
 
       Devices[read_dev] = dev;
 
@@ -74,21 +74,71 @@ int getDevices() {
   return EXIT_SUCCESS;
 }
 
+int interactive() {
+  return 0;
+} 
 
-int main() {
+
+void printList() {
+  Device *dev;
+  for (int i = 0; i < read_dev; i++) {
+    dev = Devices[i];
+    printf("%s %d\n", dev->name, dev->def);
+  }
+}
+
+int setDefault(int id) {
+  // The sysctl name for setting the default audio device
+  const char *def_unit = "hw.snd.default_unit";
+  int result;
+
+  result = sysctlbyname(def_unit, NULL, NULL, &id, sizeof(id));
+  if (result == -1) {
+      perror("Failed to set audio device");
+      return -1; // Return an error code
+  }
+
+  return 0;
+}
+
+void freeDevices() {
+  Device *dev;
+  for (int i = 0; i < read_dev; i++) {
+    dev = Devices[i];
+    free(dev->name);
+    free(dev);
+  }
+}
+
+
+int main(int argc, char *argv[]) {
+  int result;
   if (getDevices() == EXIT_FAILURE) {
     return EXIT_FAILURE;
   }
 
-  Device *dev;
-  for (int i = 0; i < read_dev; i++) {
-    dev = Devices[i];
-    printf("%s\n", dev->name);
-    free(dev->name);
-    free(dev);
+  if (argc >= 2) {
+
+    if (strcmp(argv[1], "list") == 0) {
+      printList();
+    } else if (strcmp(argv[1], "setdef") == 0) {
+      if (argc >= 3) {
+        result = setDefault(atoi(argv[2]));
+        if (result == 0) {
+          printf("\x1b[1;31mSuccesfully changed default to %d", atoi(argv[2]));
+        }
+      } else {
+        printf("\x1b[1;31mPlease provide the id for your preferred default device");
+        result = EXIT_FAILURE;
+      }
+    }
+
+  } else {
+    result = interactive();
   }
 
 
  
+  freeDevices();
   return EXIT_SUCCESS;
 }
