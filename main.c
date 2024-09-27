@@ -145,13 +145,13 @@ int update() {
 
       strcpy(default_dev_name, buffer);
       if (strcmp(default_dev_name, Selected_Device->name)==0) {
-        printf("Default device is already selected nothing changed");
+        printf("\x1b[1;31mDefault device is already selected nothing changed");
         return 0;
       } else {
         for (int i = 0; i < num_dev; i++) {
           if (strcmp(Devices[i]->name, default_dev_name)==0) {
             switchDevice(Devices[i]->id - '0');
-            printf("switched to %s", Devices[i]->name);
+            printf("\x1b[1;31mswitched to %s", Devices[i]->name);
             return 0;
           }
         }
@@ -206,6 +206,16 @@ int main(int argc, char *argv[]) {
       }
     } else if (strcmp(argv[1], "update") == 0) {
       update();
+    } else if (strcmp(argv[1], "switch") == 0) {
+      if (argc >= 3) {
+        result = switchDevice(atoi(argv[2]));
+        if (result == 0) {
+          printf("\x1b[1;31mSuccesfully switched to %d", atoi(argv[2]));
+        }
+      } else {
+        printf("\x1b[1;31mPlease provide the id of device to switch to it");
+        result = EXIT_FAILURE;
+      }
     }
 
   } else {
