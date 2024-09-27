@@ -87,18 +87,37 @@ void printList() {
   }
 }
 
+// Instruct system to change to desired device
+int switchDevice(int id) {
+    const char *def_unit = "hw.snd.default_unit";
+    int result = sysctlbyname(def_unit, NULL, NULL, &id, sizeof(id));
+    if (result == -1) {
+        perror("Failed to set audio device");
+        return -1; // Return an error code
+    }
+  
+    return 0;
+}
+
+// Switch to device and save as default
 int setDefault(int id) {
-  // The sysctl name for setting the default audio device
-  const char *def_unit = "hw.snd.default_unit";
+  char *home = getenv("HOME");
   int result;
 
-  result = sysctlbyname(def_unit, NULL, NULL, &id, sizeof(id));
-  if (result == -1) {
-      perror("Failed to set audio device");
-      return -1; // Return an error code
-  }
+  if (home != NULL) {
+    FILE *default_data = fopen(strcat(home, "/.local/share/caux/default"), "w");
+    if (default_data == NULL) {
+      perror("failed to open application data 'default'");
+      return -1;
+    }
+    fprintf(default_data, "%s\n", Devices[id]->name);
+    fclose(default_data);
 
-  return 0;
+    return switchDevice(id);
+  } else {
+    perror("Failed to determine home dir");
+    return -1;
+  }
 }
 
 void freeDevices() {
