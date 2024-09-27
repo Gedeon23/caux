@@ -21,6 +21,7 @@ typedef struct {
 
 
 Device *Devices[10] = {0};
+Device *Selected_Device;
 int num_dev = 10;
 int read_dev = 0;
 
@@ -61,6 +62,9 @@ int getDevices() {
       }
 
       dev->def = (strstr(buffer, "default") != NULL);
+      if (dev->def) {
+        Selected_Device = dev;
+      }
 
       Devices[read_dev] = dev;
 
@@ -120,6 +124,56 @@ int setDefault(int id) {
   }
 }
 
+
+// compare selected the device with preferred output device and switch if it differs
+int update() {
+  char *home = getenv("HOME");
+  FILE *default_data = fopen(strcat(home, "/.local/share/caux/default"), "r");
+  if (default_data != NULL) {
+    char buffer[200];
+    if (fgets(buffer, sizeof(buffer), default_data) != NULL) {
+      buffer[strcspn(buffer, "\n")] = '\0';
+      fclose(default_data);
+
+      size_t len = strlen(buffer);
+
+      char *default_dev_name = malloc(len+1);
+      if (default_dev_name == NULL) {
+        perror("Error allocating memory");
+        return -1;
+      }
+
+      strcpy(default_dev_name, buffer);
+      if (strcmp(default_dev_name, Selected_Device->name)==0) {
+        printf("Default device is already selected nothing changed");
+        return 0;
+      } else {
+        for (int i = 0; i < num_dev; i++) {
+          if (strcmp(Devices[i]->name, default_dev_name)==0) {
+            switchDevice(Devices[i]->id - '0');
+            printf("switched to %s", Devices[i]->name);
+            return 0;
+          }
+        }
+      }
+    
+      printf("selected device: %s\n",buffer);
+      return 0;
+    } else {
+      fclose(default_data);
+      perror("Error loading default data");
+      return -1;
+    }
+
+  } else {
+    fclose(default_data);
+    perror("failed to open application data 'default'");
+    return -1;
+  }
+}
+
+
+// free all memory allocations associated with the Device structs stored in the global array
 void freeDevices() {
   Device *dev;
   for (int i = 0; i < read_dev; i++) {
@@ -150,6 +204,8 @@ int main(int argc, char *argv[]) {
         printf("\x1b[1;31mPlease provide the id for your preferred default device");
         result = EXIT_FAILURE;
       }
+    } else if (strcmp(argv[1], "update") == 0) {
+      update();
     }
 
   } else {
