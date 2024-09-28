@@ -94,19 +94,29 @@ void printList() {
 // Instruct system to change to desired device
 int switchDevice(int id) {
     const char *def_unit = "hw.snd.default_unit";
-    int result = sysctlbyname(def_unit, NULL, NULL, &id, sizeof(id));
-    if (result == -1) {
-        perror("Failed to set audio device");
-        return -1; // Return an error code
+    if (id < read_dev && id >= 0) {
+      int result = sysctlbyname(def_unit, NULL, NULL, &id, sizeof(id));
+      if (result == -1) {
+          perror("Failed to set audio device");
+          return -1; // Return an error code
+      }
+      return 0;
+    } else {
+      perror("id is out of bounds");
+      return -1;
     }
-  
-    return 0;
 }
 
 // Switch to device and save as default
 int setDefault(int id) {
   char *home = getenv("HOME");
   int result;
+
+  if (id >= read_dev || id < 0) {
+    perror("id is out of bounds");
+    return -1;
+  }
+  
 
   if (home != NULL) {
     FILE *default_data = fopen(strcat(home, "/.local/share/caux/default"), "w");
