@@ -1,10 +1,10 @@
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/sysctl.h>
 #include <sys/types.h>
-#include <stdbool.h>
 
 typedef enum {
   play,
@@ -13,12 +13,11 @@ typedef enum {
 } Type;
 
 typedef struct {
-  char id; // id 0…
+  char id;    // id 0…
   char *name; // name eg "Sonova Consumer Hearing MOMENTUM 4"
-  Type type; // type eg (play), (play/rec)
-  bool def; // is the default
+  Type type;  // type eg (play), (play/rec)
+  bool def;   // is the default
 } Device;
-
 
 Device *Devices[10] = {0};
 Device *Selected_Device;
@@ -29,27 +28,24 @@ int getDevices() {
   FILE *sndstat;
   char buffer[256];
   Device *dev;
-  char *name_start = buffer + 7; 
+  char *name_start = buffer + 7;
   char *name_end;
 
-  
   sndstat = fopen("/dev/sndstat", "r");
   if (sndstat == NULL) {
     perror("Error opening /dev/sndstat");
     return EXIT_FAILURE;
   }
 
-
-
-// Parse lines of the following format:
-// pcm4: <NAME OF MY HEADPHONES> (play/rec) default
-//  id^   ^name                   ^type     ^selected
+  // Parse lines of the following format:
+  // pcm4: <NAME OF MY HEADPHONES> (play/rec) default
+  //  id^   ^name                   ^type     ^selected
 
   while (fgets(buffer, sizeof(buffer), sndstat) != NULL) {
-    name_end = strchr(buffer, '>');   
+    name_end = strchr(buffer, '>');
     if (name_end != NULL) {
       dev = malloc(sizeof(Device));
-      size_t name_length = name_end -name_start;
+      size_t name_length = name_end - name_start;
       char *name = malloc(name_length);
       dev->id = buffer[3];
       strncpy(name, name_start, name_length);
@@ -70,7 +66,6 @@ int getDevices() {
 
       read_dev++;
     }
-    
   }
 
   fclose(sndstat);
@@ -78,10 +73,7 @@ int getDevices() {
   return EXIT_SUCCESS;
 }
 
-int interactive() {
-  return 0;
-} 
-
+int interactive() { return 0; }
 
 void printList() {
   Device *dev;
@@ -101,8 +93,8 @@ int switchDevice(int id) {
   const char *def_unit = "hw.snd.default_unit";
   int result = sysctlbyname(def_unit, NULL, NULL, &id, sizeof(id));
   if (result == -1) {
-      perror("Failed to set audio device");
-      return -1; // Return an error code
+    perror("Failed to set audio device");
+    return -1; // Return an error code
   }
   return 0;
 }
@@ -113,7 +105,7 @@ int setDefault(int id) {
     perror("id is out of bounds");
     return -1;
   }
-  
+
   char *home = getenv("HOME");
   int result;
 
@@ -133,56 +125,66 @@ int setDefault(int id) {
   }
 }
 
-
-// compare selected the device with preferred output device and switch if it differs
+// compare selected the device with preferred output device and switch if it
+// differs
 int update() {
   char *home = getenv("HOME");
+  bool found_default_device = false;
   FILE *default_data = fopen(strcat(home, "/.local/share/caux/default"), "r");
-  if (default_data != NULL) {
-    char buffer[200];
-    if (fgets(buffer, sizeof(buffer), default_data) != NULL) {
-      buffer[strcspn(buffer, "\n")] = '\0';
-      fclose(default_data);
 
-      size_t len = strlen(buffer);
-
-      char *default_dev_name = malloc(len+1);
-      if (default_dev_name == NULL) {
-        perror("Error allocating memory");
-        return -1;
-      }
-
-      strcpy(default_dev_name, buffer);
-      if (strcmp(default_dev_name, Selected_Device->name)==0) {
-        printf("\x1b[1;31mDefault device is already selected nothing changed");
-        return 0;
-      } else {
-        for (int i = 0; i < num_dev; i++) {
-          if (strcmp(Devices[i]->name, default_dev_name)==0) {
-            switchDevice(Devices[i]->id - '0');
-            printf("\x1b[1;31mswitched to %s", Devices[i]->name);
-            return 0;
-          }
-        }
-      }
-    
-      printf("selected device: %s\n",buffer);
-      return 0;
-    } else {
-      fclose(default_data);
-      perror("Error loading default data");
-      return -1;
-    }
-
-  } else {
+  if (default_data == NULL) {
     fclose(default_data);
     perror("failed to open application data 'default'");
     return -1;
   }
+  
+  char buffer[200];
+  if (fgets(buffer, sizeof(buffer), default_data) == NULL) {
+    fclose(default_data);
+    perror("Error loading default data");
+    return -1;
+  }
+
+  fclose(default_data);
+
+  buffer[strcspn(buffer, "\n")] = '\0';
+
+  size_t len = strlen(buffer);
+
+  char *default_dev_name = malloc(len + 1);
+  if (default_dev_name == NULL) {
+    perror("Error allocating memory");
+    return -1;
+  }
+
+  strcpy(default_dev_name, buffer);
+  if (strcmp(default_dev_name, Selected_Device->name) == 0) {
+    printf("\x1b[1;31mDefault device is already selected nothing changed");
+    free(default_dev_name);
+    return 0;
+  } else {
+    for (int i = 0; i < num_dev; i++) {
+      if (strcmp(Devices[i]->name, default_dev_name) == 0) {
+        switchDevice(Devices[i]->id - '0');
+        found_default_device = true;
+        printf("\x1b[1;31mswitched to %s", Devices[i]->name);
+        free(default_dev_name);
+        return 0;
+      }
+    }
+  }
+
+  if (!found_default_device) {
+    printf("\x1b[1;31mcouldn't find default device %s", default_dev_name);
+    free(default_dev_name);
+    return -1;
+  }
+
+  return 0;
 }
 
-
-// free all memory allocations associated with the Device structs stored in the global array
+// free all memory allocations associated with the Device structs stored in the
+// global array
 void freeDevices() {
   Device *dev;
   for (int i = 0; i < read_dev; i++) {
@@ -191,7 +193,6 @@ void freeDevices() {
     free(dev);
   }
 }
-
 
 int main(int argc, char *argv[]) {
   int result;
@@ -210,7 +211,8 @@ int main(int argc, char *argv[]) {
           printf("\x1b[1;31mSuccesfully changed default to %d", atoi(argv[2]));
         }
       } else {
-        printf("\x1b[1;31mPlease provide the id for your preferred default device");
+        printf("\x1b[1;31mPlease provide the id for your preferred default "
+               "device");
         result = EXIT_FAILURE;
       }
     } else if (strcmp(argv[1], "update") == 0) {
@@ -231,8 +233,6 @@ int main(int argc, char *argv[]) {
     result = interactive();
   }
 
-
- 
   freeDevices();
   return EXIT_SUCCESS;
 }
